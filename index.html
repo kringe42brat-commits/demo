@@ -24,7 +24,6 @@
   }
   h1 { font-size:18px; margin-bottom:18px; text-align:center; }
 
-  /* Обычная форма — просто для вида, реально не работает */
   input {
     width:100%;
     padding:9px 10px;
@@ -60,16 +59,18 @@
   }
   .btn-sso:hover { background:#333; }
 
-  /* Профиль после входа */
+  /* Профиль после входа — только аватар и кнопка */
   #profile { display:none; text-align:center; }
   #profile img {
-    width:56px; height:56px;
+    width:96px;        /* увеличенная аватарка */
+    height:96px;
     border-radius:50%;
-    margin-bottom:12px;
+    margin-bottom:20px;
     background:#eee;
+    display:block;
+    margin-left:auto;
+    margin-right:auto;
   }
-  #profile h2 { font-size:16px; margin-bottom:4px; }
-  #profile p { font-size:13px; color:#777; margin-bottom:16px; }
   .btn-out {
     width:100%;
     padding:9px;
@@ -80,6 +81,7 @@
     font-size:14px;
     cursor:pointer;
   }
+  .btn-out:hover { background:#ffe6e6; }
 </style>
 </head>
 <body>
@@ -96,21 +98,16 @@
     <button class="btn-sso" id="ssoBtn">Войти через SSO</button>
   </div>
 
-  <!-- Профиль -->
+  <!-- Профиль (только аватар + выход) -->
   <div id="profile">
-    <img id="avatar" src="" alt="">
-    <h2 id="name">—</h2>
-    <p id="email">—</p>
+    <img id="avatar" src="" alt="Аватар">
     <button class="btn-out" id="logoutBtn">Выйти</button>
   </div>
 
 </div>
 
 <script>
-  // ──────────────────────────────────────────
-  // АДРЕС ТВОЕГО SSO-СЕРВИСА — поменяй если другой
   const SSO_URL = 'https://sso-service1.onrender.com';
-  // ──────────────────────────────────────────
 
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -134,9 +131,10 @@
   function showProfile(user) {
     document.getElementById('login').style.display = 'none';
     document.getElementById('profile').style.display = 'block';
-    document.getElementById('name').textContent  = user.name || user.sub;
-    document.getElementById('email').textContent = user.email || '';
-    document.getElementById('avatar').src = user.av || 'https://placehold.co/56';
+    // Устанавливаем только аватарку
+    const avatar = document.getElementById('avatar');
+    avatar.src = user.av || 'https://placehold.co/96';
+    // Имя и email не показываем
   }
 
   function showLogin() {
@@ -144,8 +142,6 @@
     document.getElementById('profile').style.display = 'none';
   }
 
-  // Кнопка "Войти через SSO" — отправляем на SSO-сервис,
-  // указав куда вернуть пользователя после входа (?return=)
   document.getElementById('ssoBtn').addEventListener('click', () => {
     const myUrl = window.location.origin + window.location.pathname;
     window.location.href = `${SSO_URL}/?return=${encodeURIComponent(myUrl)}`;
@@ -156,9 +152,6 @@
     showLogin();
   });
 
-  // При загрузке страницы:
-  // 1) Если в URL есть ?token=... — значит вернулись с SSO, сохраняем
-  // 2) Иначе проверяем сохранённую cookie
   (function init() {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get('token');
