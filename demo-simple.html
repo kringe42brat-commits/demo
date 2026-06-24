@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo App</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: system-ui, sans-serif;
+    background:#f5f5f7;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .card {
+    background:#fff;
+    border:1px solid #ddd;
+    border-radius:10px;
+    width:100%;
+    max-width:340px;
+    padding:28px;
+  }
+  h1 { font-size:18px; margin-bottom:18px; text-align:center; }
+
+  /* Обычная форма — просто для вида, реально не работает */
+  input {
+    width:100%;
+    padding:9px 10px;
+    margin-bottom:10px;
+    border:1px solid #ccc;
+    border-radius:6px;
+    font-size:14px;
+  }
+  .btn-fake {
+    width:100%;
+    padding:9px;
+    background:#eee;
+    border:1px solid #ccc;
+    border-radius:6px;
+    font-size:14px;
+    color:#888;
+    cursor:not-allowed;
+    margin-bottom:16px;
+  }
+
+  .or { text-align:center; color:#999; font-size:12px; margin:14px 0; }
+
+  .btn-sso {
+    width:100%;
+    padding:10px;
+    background:#111;
+    color:#fff;
+    border:none;
+    border-radius:6px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .btn-sso:hover { background:#333; }
+
+  /* Профиль после входа */
+  #profile { display:none; text-align:center; }
+  #profile img {
+    width:56px; height:56px;
+    border-radius:50%;
+    margin-bottom:12px;
+    background:#eee;
+  }
+  #profile h2 { font-size:16px; margin-bottom:4px; }
+  #profile p { font-size:13px; color:#777; margin-bottom:16px; }
+  .btn-out {
+    width:100%;
+    padding:9px;
+    background:#fff;
+    border:1px solid #e33;
+    color:#e33;
+    border-radius:6px;
+    font-size:14px;
+    cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- Форма входа -->
+  <div id="login">
+    <h1>Вход в приложение</h1>
+    <input type="text" placeholder="Логин" disabled>
+    <input type="password" placeholder="Пароль" disabled>
+    <button class="btn-fake" disabled>Войти (демо, не работает)</button>
+    <div class="or">или</div>
+    <button class="btn-sso" id="ssoBtn">Войти через SSO</button>
+  </div>
+
+  <!-- Профиль -->
+  <div id="profile">
+    <img id="avatar" src="" alt="">
+    <h2 id="name">—</h2>
+    <p id="email">—</p>
+    <button class="btn-out" id="logoutBtn">Выйти</button>
+  </div>
+
+</div>
+
+<script>
+  // ──────────────────────────────────────────
+  // АДРЕС ТВОЕГО SSO-СЕРВИСА — поменяй если другой
+  const SSO_URL = 'https://sso-service1.onrender.com';
+  // ──────────────────────────────────────────
+
+  function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+  function setCookie(name, value, days) {
+    const exp = new Date(Date.now() + days * 864e5).toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${exp};path=/`;
+  }
+  function deleteCookie(name) {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  }
+
+  function decodeJwt(token) {
+    try {
+      const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(b64));
+    } catch { return null; }
+  }
+
+  function showProfile(user) {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('profile').style.display = 'block';
+    document.getElementById('name').textContent  = user.name || user.sub;
+    document.getElementById('email').textContent = user.email || '';
+    document.getElementById('avatar').src = user.av || 'https://placehold.co/56';
+  }
+
+  function showLogin() {
+    document.getElementById('login').style.display = 'block';
+    document.getElementById('profile').style.display = 'none';
+  }
+
+  // Кнопка "Войти через SSO" — отправляем на SSO-сервис,
+  // указав куда вернуть пользователя после входа (?return=)
+  document.getElementById('ssoBtn').addEventListener('click', () => {
+    const myUrl = window.location.origin + window.location.pathname;
+    window.location.href = `${SSO_URL}/?return=${encodeURIComponent(myUrl)}`;
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    deleteCookie('sso_token');
+    showLogin();
+  });
+
+  // При загрузке страницы:
+  // 1) Если в URL есть ?token=... — значит вернулись с SSO, сохраняем
+  // 2) Иначе проверяем сохранённую cookie
+  (function init() {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('token');
+
+    if (tokenFromUrl) {
+      history.replaceState(null, '', window.location.pathname);
+      setCookie('sso_token', tokenFromUrl, 7);
+      const user = decodeJwt(tokenFromUrl);
+      if (user) { showProfile(user); return; }
+    }
+
+    const saved = getCookie('sso_token');
+    if (saved) {
+      const user = decodeJwt(saved);
+      const expired = !user?.exp || (Date.now() / 1000) > user.exp;
+      if (user && !expired) { showProfile(user); return; }
+      deleteCookie('sso_token');
+    }
+
+    showLogin();
+  })();
+</script>
+
+</body>
+</html>
